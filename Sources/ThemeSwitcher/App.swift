@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -59,12 +60,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         menu.addItem(action: "Open Picker…", #selector(openPicker), target: self)
         menu.addItem(action: "Update Themes", #selector(updateThemes), target: self)
+        menu.addItem(.separator())
+        let login = menu.addItem(action: "Start at Login", #selector(toggleStartAtLogin), target: self)
+        login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(action: "Quit", #selector(NSApplication.terminate(_:)), target: NSApp)
     }
 
     @objc private func chooseTheme(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? String, let theme = themes.first(where: { $0.id == id }) else { return }
         apply(theme)
+    }
+
+    @objc private func toggleStartAtLogin() {
+        do {
+            if SMAppService.mainApp.status == .enabled {
+                try SMAppService.mainApp.unregister()
+            } else {
+                try SMAppService.mainApp.register()
+            }
+            status = nil
+        } catch {
+            status = "Start at Login failed: \(error.localizedDescription)"
+        }
     }
 
     @objc private func openPicker() {
@@ -123,9 +140,11 @@ private extension NSMenu {
         addItem(item)
     }
 
-    func addItem(action title: String, _ selector: Selector, target: AnyObject) {
+    @discardableResult
+    func addItem(action title: String, _ selector: Selector, target: AnyObject) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: selector, keyEquivalent: "")
         item.target = target
         addItem(item)
+        return item
     }
 }
