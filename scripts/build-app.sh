@@ -11,7 +11,7 @@ cp "$(swift build -c release --show-bin-path)/ThemeSwitcher" "$APP/Contents/MacO
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp -R Resources/templates "$APP/Contents/Resources/templates"
 codesign --force --options runtime --entitlements Resources/ThemeSwitcher.entitlements \
-    --sign "${CODESIGN_IDENTITY:-Interview Recorder Local Signing}" "$APP"
+    --sign "${CODESIGN_IDENTITY:-Sander Local Signing}" "$APP"
 codesign --verify --strict "$APP"
 open "$APP"
 printf 'Installed: %s\n' "$APP"
