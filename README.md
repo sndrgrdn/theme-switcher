@@ -120,7 +120,9 @@ The skill goes into `~/.claude/skills` for Claude Code and into `~/.agents/skill
 
 The command talks to the app through a Unix socket at `~/Library/Application Support/Theme Switcher/control.sock` that only your user can open.
 
-Apps that only need to start an action can also use the `theme-switcher` URL scheme:
+### Start actions with a URL
+
+Apps that only need to start an action can use the `theme-switcher` URL scheme:
 
 ```sh
 open "theme-switcher://picker"
