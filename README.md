@@ -38,7 +38,7 @@ You need macOS 14 or later, the Xcode Command Line Tools, and `git`.
 	./scripts/build-app.sh
 	```
 
-	The script builds a release binary, installs `Theme Switcher.app` in `~/Applications`, and starts it. A palette icon appears in the menu bar.
+	The script builds a release binary, installs `Theme Switcher.app` in `~/Applications`, links the `theme-switcher` command into `~/.local/bin`, and starts the app. A palette icon appears in the menu bar.
 
 3. Wait for the themes to download. On first launch, Theme Switcher fetches the `themes` folder from Omarchy's repository.
 
@@ -70,7 +70,45 @@ Press <kbd>⌃⌥⌘Space</kbd> to open the picker. Press it again to close it.
 
 The menu bar icon also lists every theme, and **Update Themes** fetches the latest themes from Omarchy.
 
-Other apps and scripts can use the `theme-switcher` URL scheme:
+## Use the command line
+
+`build-app.sh` links the `theme-switcher` command into `~/.local/bin`. The command sends each request to the running app and waits for the reply. When the app isn't running, the command starts it in the background.
+
+```sh
+theme-switcher list              # * marks the current theme
+theme-switcher current           # the current theme and its background
+theme-switcher set tokyo-night   # apply a theme and wait until every app has it
+theme-switcher picker            # open the picker
+theme-switcher update            # fetch the latest themes from Omarchy
+```
+
+`set` takes a theme's id or its name, so `set "Tokyo Night"` works too. Setting the current theme again moves to its next background.
+
+Add `--json` to any command to get the app's reply as JSON. Scripts and agents can read each app's result from it:
+
+```sh
+theme-switcher set tokyo-night --json
+```
+
+```json
+{
+  "report" : {
+    "background" : "0-liftoff.webp",
+    "results" : [
+      { "status" : "applied", "target" : "macOS appearance" },
+      { "status" : "skipped", "target" : "dinky" },
+      { "status" : "failed", "target" : "Rex", "message" : "rex not found" }
+    ],
+    "theme" : "tokyo-night"
+  }
+}
+```
+
+`status` is `applied`, `skipped` when the app isn't installed, or `failed` with a `message`. The command exits with 0 on success, 1 when the command or any app failed, and 2 on a usage error.
+
+The command talks to the app through a Unix socket at `~/Library/Application Support/Theme Switcher/control.sock` that only your user can open.
+
+Apps that only need to start an action can also use the `theme-switcher` URL scheme:
 
 ```sh
 open "theme-switcher://picker"
@@ -107,6 +145,7 @@ THEME_COLORS="$HOME/Library/Application Support/Theme Switcher/current/sketchyba
 | `~/Library/Application Support/Theme Switcher/state.json` | The current theme and each theme's last background. |
 | `~/Library/Application Support/Theme Switcher/apply.log` | One entry per theme switch, with the result for each app. |
 | `~/Library/Application Support/Theme Switcher/backups` | Your config files as they were before the first change. |
+| `~/Library/Application Support/Theme Switcher/control.sock` | The socket the `theme-switcher` command uses. |
 | `~/Library/Caches/Theme Switcher/previews` | Resized previews for the picker. |
 
 ## License
