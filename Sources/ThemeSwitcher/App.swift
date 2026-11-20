@@ -17,10 +17,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = NSMenu()
         statusItem.menu?.delegate = self
 
-        hotKey = HotKey(keyCode: kVK_Space, modifiers: controlKey | optionKey | shiftKey | cmdKey) { [weak self] in
+        hotKey = HotKey(keyCode: kVK_Space, modifiers: controlKey | optionKey | cmdKey) { [weak self] in
             self?.togglePicker()
         }
-        if hotKey == nil { status = "⌃⌥⇧⌘Space is taken by another app" }
+        if hotKey == nil { status = "⌃⌥⌘Space is taken by another app" }
 
         NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleURL(_:reply:)),
                                                      forEventClass: AEEventClass(kInternetEventClass),
