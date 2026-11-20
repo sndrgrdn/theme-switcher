@@ -106,6 +106,18 @@ theme-switcher set tokyo-night --json
 
 `status` is `applied`, `skipped` when the app isn't installed, or `failed` with a `message`. The command exits with 0 on success, 1 when the command or any app failed, and 2 on a usage error.
 
+### Let agents use it
+
+To teach coding agents to use the command, install the agent skill:
+
+```sh
+theme-switcher skill setup
+```
+
+The skill goes into `~/.claude/skills` for Claude Code and into `~/.agents/skills` for Codex, OpenCode, and pi, for each agent that is installed. It tells the agent to run `theme-switcher skill show`, which prints the guide from the installed command, so the guide stays in step with each update. Run `theme-switcher skill status` to see what is installed, and `theme-switcher skill remove` to remove it.
+
+### How the command reaches the app
+
 The command talks to the app through a Unix socket at `~/Library/Application Support/Theme Switcher/control.sock` that only your user can open.
 
 Apps that only need to start an action can also use the `theme-switcher` URL scheme:
