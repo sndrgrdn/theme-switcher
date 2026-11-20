@@ -143,21 +143,12 @@ struct PickerView: View {
         let matching = model.matching
         let position = matching.firstIndex { $0.id == model.selectedID } ?? 0
         let visible = matching.indices.filter { abs($0 - position) <= model.radius }
-        let previewX = model.previewX
 
         ZStack {
             Color.black.opacity(0.001)
 
             VStack(spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    if !matching.isEmpty {
-                        Slant(skew: Carousel.skew)
-                            .fill(model.color("background", .black))
-                            .frame(width: Carousel.expanded.width, height: Carousel.expanded.height)
-                            .shadow(color: .black.opacity(0.35), radius: 32, y: 18)
-                            .offset(x: previewX)
-                            .zIndex(99)
-                    }
                     ForEach(visible, id: \.self) { index in
                         Card(theme: matching[index], relative: index - position, model: model)
                     }
@@ -220,6 +211,7 @@ struct Card: View {
         .clipShape(shape)
         .overlay(shape.stroke(selected ? model.color("accent", .accentColor) : model.color("foreground", .white).opacity(0.28),
                               lineWidth: selected ? 3 : 1))
+        .shadow(color: .black.opacity(selected ? 0.35 : 0), radius: selected ? 32 : 0, y: selected ? 18 : 0)
         .scaleEffect(pressed ? 0.97 : 1)
         .animation(.easeOut(duration: 0.16), value: pressed)
         .animation(.easeOut(duration: 0.15), value: hovering)
