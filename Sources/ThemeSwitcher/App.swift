@@ -46,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                   kCGImageSourceCreateThumbnailFromImageAlways: true,
-                  kCGImageSourceThumbnailMaxPixelSize: 640,
+                  kCGImageSourceThumbnailMaxPixelSize: 1600,
               ] as CFDictionary)
         else { return nil }
         return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
