@@ -9,7 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var hotKey: HotKey?
     private var themes: [Theme] = []
     private var status: String?
-    private var failures: [TargetFailure] = []
+    private var results: [TargetResult] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem.button?.image = NSImage(systemSymbolName: "paintpalette", accessibilityDescription: "Theme Switcher")
@@ -30,6 +30,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         reload()
         if themes.isEmpty { updateThemes() }
+        do { try ControlSocket.listen { [weak self] in self?.respond(to: $0) ?? .failure("Theme Switcher is quitting") } } catch {
+            status = "Command line unavailable: \(error.localizedDescription)"
+        }
     }
 
     private func reload() {
@@ -47,7 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         header.isEnabled = false
         menu.addItem(header)
         if let status { menu.addItem(disabled: status) }
-        for failure in failures { menu.addItem(disabled: "⚠︎ \(failure.target): \(failure.message)") }
+        for result in results { if let failure = result.failure { menu.addItem(disabled: "⚠︎ \(result.target): \(failure)") } }
         menu.addItem(.separator())
 
         for theme in themes {
@@ -59,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         menu.addItem(.separator())
         menu.addItem(action: "Open Picker…", #selector(openPicker), target: self)
-        menu.addItem(action: "Update Themes", #selector(updateThemes), target: self)
+        menu.addItem(action: "Update Themes", #selector(chooseUpdateThemes), target: self)
         menu.addItem(.separator())
         let login = menu.addItem(action: "Start at Login", #selector(toggleStartAtLogin), target: self)
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
@@ -93,30 +96,86 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         picker.isOpen ? picker.close() : openPicker()
     }
 
-    @objc private func updateThemes() {
+    @objc private func chooseUpdateThemes() {
+        updateThemes()
+    }
+
+    private func updateThemes(then completion: ((String?) -> Void)? = nil) {
         status = "Updating themes…"
         queue.async {
-            let result: String?
-            do { try ThemeLibrary.sync(); result = nil } catch { result = "Update failed: \(error.localizedDescription)" }
+            let failure: String?
+            do { try ThemeLibrary.sync(); failure = nil } catch { failure = "Update failed: \(error.localizedDescription)" }
             DispatchQueue.main.async {
-                self.status = result
+                self.status = failure
                 self.reload()
+                completion?(failure)
             }
         }
     }
 
-    private func apply(_ theme: Theme) {
+    private func apply(_ theme: Theme, then completion: ((Result<ApplyReport, Error>) -> Void)? = nil) {
         status = "Applying \(theme.name)…"
         queue.async {
-            let failures: [TargetFailure]
-            do { failures = try ThemeApplier.apply(theme) } catch {
-                failures = [TargetFailure(target: theme.name, message: error.localizedDescription)]
-            }
+            let result = Result { try ThemeApplier.apply(theme) }
             DispatchQueue.main.async {
                 self.status = nil
-                self.failures = failures
+                switch result {
+                case .success(let report): self.results = report.results
+                case .failure(let error): self.results = [TargetResult(target: theme.name, outcome: .failed(error.localizedDescription))]
+                }
+                completion?(result)
             }
         }
+    }
+
+    private func respond(to request: ControlRequest) -> ControlResponse {
+        switch request {
+        case .list:
+            let themes = DispatchQueue.main.sync { reload(); return self.themes }
+            let current = ThemeState.load().theme
+            return ControlResponse(themes: themes.map {
+                ThemeSummary(id: $0.id, name: $0.name, mode: $0.mode.rawValue, current: $0.id == current)
+            })
+        case .current:
+            let state = ThemeState.load()
+            guard let id = state.theme else { return .failure("no theme applied yet") }
+            let backgrounds = ThemeLibrary.theme(id)?.backgrounds ?? []
+            let background = state.backgrounds[id].flatMap { backgrounds.indices.contains($0) ? backgrounds[$0] : nil }
+            return ControlResponse(current: id, background: background?.lastPathComponent)
+        case .picker:
+            DispatchQueue.main.async { self.openPicker() }
+            return ControlResponse()
+        case .update:
+            return wait { done in self.updateThemes { done($0.map(ControlResponse.failure) ?? ControlResponse()) } }
+        case .set(let name):
+            guard let theme = DispatchQueue.main.sync(execute: { self.theme(named: name) }) else {
+                return .failure("no theme named \(name)")
+            }
+            return wait { done in
+                self.apply(theme) { result in
+                    switch result {
+                    case .success(let report): done(ControlResponse(report: report))
+                    case .failure(let error): done(.failure(error.localizedDescription))
+                    }
+                }
+            }
+        }
+    }
+
+    private func theme(named name: String) -> Theme? {
+        reload()
+        let id = ThemeLibrary.normalize(name, among: themes)
+        return themes.first { $0.id == id }
+    }
+
+    private func wait(_ start: @escaping (@escaping (ControlResponse) -> Void) -> Void) -> ControlResponse {
+        let semaphore = DispatchSemaphore(value: 0)
+        var response = ControlResponse()
+        DispatchQueue.main.async {
+            start { response = $0; semaphore.signal() }
+        }
+        semaphore.wait()
+        return response
     }
 
     @objc private func handleURL(_ event: NSAppleEventDescriptor, reply: NSAppleEventDescriptor) {
@@ -125,9 +184,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         switch url.host {
         case "picker": openPicker()
         case "set":
-            reload()
-            let id = ThemeLibrary.normalize(url.lastPathComponent.removingPercentEncoding ?? "", among: themes)
-            if let theme = themes.first(where: { $0.id == id }) { apply(theme) }
+            if let theme = theme(named: url.lastPathComponent.removingPercentEncoding ?? "") { apply(theme) }
         default: break
         }
     }

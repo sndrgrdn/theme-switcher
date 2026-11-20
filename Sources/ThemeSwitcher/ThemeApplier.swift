@@ -19,9 +19,50 @@ extension ThemeTarget {
     var isInstalled: Bool { true }
 }
 
-struct TargetFailure {
+struct TargetResult {
+    enum Outcome {
+        case applied, skipped, failed(String)
+    }
+
     let target: String
-    let message: String
+    let outcome: Outcome
+
+    var failure: String? {
+        if case .failed(let message) = outcome { return message }
+        return nil
+    }
+}
+
+extension TargetResult: Codable {
+    private enum CodingKeys: String, CodingKey { case target, status, message }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        target = try container.decode(String.self, forKey: .target)
+        switch try container.decode(String.self, forKey: .status) {
+        case "applied": outcome = .applied
+        case "skipped": outcome = .skipped
+        default: outcome = .failed(try container.decodeIfPresent(String.self, forKey: .message) ?? "")
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(target, forKey: .target)
+        switch outcome {
+        case .applied: try container.encode("applied", forKey: .status)
+        case .skipped: try container.encode("skipped", forKey: .status)
+        case .failed(let message):
+            try container.encode("failed", forKey: .status)
+            try container.encode(message, forKey: .message)
+        }
+    }
+}
+
+struct ApplyReport: Codable {
+    let theme: String
+    let background: String?
+    let results: [TargetResult]
 }
 
 struct ThemeState: Codable {
@@ -50,7 +91,7 @@ enum ThemeApplier {
         ClaudeCodeTarget(),
     ]
 
-    static func apply(_ theme: Theme) throws -> [TargetFailure] {
+    static func apply(_ theme: Theme) throws -> ApplyReport {
         var state = ThemeState.load()
         var background: URL?
         if !theme.backgrounds.isEmpty {
@@ -75,18 +116,19 @@ enum ThemeApplier {
             do { try targets[index].apply(applied) } catch { lock.withLock { errors[index] = error } }
         }
 
-        var failures: [TargetFailure] = []
-        for (index, target) in targets.enumerated() {
+        let results = targets.enumerated().map { index, target in
             if !installed[index] {
                 Log.append("  skip   \(target.name): not installed")
-            } else if let error = errors[index] {
-                failures.append(TargetFailure(target: target.name, message: error.localizedDescription))
-                Log.append("  FAILED \(target.name): \(error.localizedDescription)")
-            } else {
-                Log.append("  ok     \(target.name)")
+                return TargetResult(target: target.name, outcome: .skipped)
             }
+            if let error = errors[index] {
+                Log.append("  FAILED \(target.name): \(error.localizedDescription)")
+                return TargetResult(target: target.name, outcome: .failed(error.localizedDescription))
+            }
+            Log.append("  ok     \(target.name)")
+            return TargetResult(target: target.name, outcome: .applied)
         }
-        return failures
+        return ApplyReport(theme: theme.id, background: background?.lastPathComponent, results: results)
     }
 
     private static func stage(_ theme: Theme) throws {

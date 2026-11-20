@@ -14,5 +14,7 @@ IDENTITY="${CODESIGN_IDENTITY:-Sander Local Signing}"
 security find-identity -v -p codesigning | grep -qF "\"$IDENTITY\"" || IDENTITY=-
 codesign --force --options runtime --entitlements Resources/ThemeSwitcher.entitlements --sign "$IDENTITY" "$APP"
 codesign --verify --strict "$APP"
+mkdir -p "$HOME/.local/bin"
+ln -sf "$APP/Contents/MacOS/ThemeSwitcher" "$HOME/.local/bin/theme-switcher"
 open "$APP"
-printf 'Installed: %s\nSigned with: %s\n' "$APP" "$IDENTITY"
+printf 'Installed: %s\nCommand line: %s\nSigned with: %s\n' "$APP" "$HOME/.local/bin/theme-switcher" "$IDENTITY"
