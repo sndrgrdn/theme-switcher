@@ -61,18 +61,17 @@ enum ThemeApplier {
         try state.save()
 
         let applied = AppliedTheme(theme: theme, background: background)
-        var log = ["\(Date()) \(theme.id) background=\(background?.lastPathComponent ?? "none")"]
+        Log.append("\(Date()) \(theme.id) background=\(background?.lastPathComponent ?? "none")")
         var failures: [TargetFailure] = []
         for target in targets {
             do {
                 try target.apply(applied)
-                log.append("  ok     \(target.name)")
+                Log.append("  ok     \(target.name)")
             } catch {
                 failures.append(TargetFailure(target: target.name, message: error.localizedDescription))
-                log.append("  FAILED \(target.name): \(error.localizedDescription)")
+                Log.append("  FAILED \(target.name): \(error.localizedDescription)")
             }
         }
-        try? (log.joined(separator: "\n") + "\n").write(to: Paths.log, atomically: true, encoding: .utf8)
         return failures
     }
 
@@ -96,6 +95,19 @@ enum ThemeApplier {
 
         try? fm.removeItem(at: Paths.current)
         try fm.moveItem(at: Paths.next, to: Paths.current)
+    }
+}
+
+enum Log {
+    static func append(_ line: String) {
+        let data = Data((line + "\n").utf8)
+        guard let handle = try? FileHandle(forWritingTo: Paths.log) else {
+            try? data.write(to: Paths.log)
+            return
+        }
+        defer { try? handle.close() }
+        _ = try? handle.seekToEnd()
+        try? handle.write(contentsOf: data)
     }
 }
 

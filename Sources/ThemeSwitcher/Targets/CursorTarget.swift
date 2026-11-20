@@ -11,16 +11,7 @@ struct CursorTarget: ThemeTarget {
         guard Shell.which("cursor") != nil else { throw ShellError(message: "cursor CLI not found") }
 
         let colorTheme: String
-        if let descriptor = applied.theme.file("vscode.json") {
-            let json = try JSONSerialization.jsonObject(with: Data(contentsOf: descriptor)) as? [String: Any] ?? [:]
-            guard let name = json["name"] as? String,
-                  name.range(of: #"^[^\p{Cc}"\\]+$"#, options: .regularExpression) != nil
-            else { throw ShellError(message: "vscode.json has no usable theme name") }
-            if let id = json["extension"] as? String,
-               id.range(of: "^[a-zA-Z0-9._-]+$", options: .regularExpression) != nil,
-               !isInstalled(id) {
-                try Shell.run("cursor", ["--install-extension", id])
-            }
+        if let name = try extensionTheme(applied) {
             colorTheme = name
         } else {
             try installGenerated(applied.file("vscode-theme.json"))
@@ -31,6 +22,25 @@ struct CursorTarget: ThemeTarget {
         let text = try String(contentsOf: settings, encoding: .utf8)
         let updated = [preferred, "workbench.colorTheme"].reduce(text) { Files.setJSONString($1, colorTheme, in: $0) }
         if updated != text { try Files.write(updated, to: settings) }
+    }
+
+    private func extensionTheme(_ applied: AppliedTheme) throws -> String? {
+        guard let descriptor = applied.theme.file("vscode.json") else { return nil }
+        let json = try JSONSerialization.jsonObject(with: Data(contentsOf: descriptor)) as? [String: Any] ?? [:]
+        guard let name = json["name"] as? String,
+              name.range(of: #"^[^\p{Cc}"\\]+$"#, options: .regularExpression) != nil
+        else { throw ShellError(message: "vscode.json has no usable theme name") }
+        guard let id = json["extension"] as? String,
+              id.range(of: "^[a-zA-Z0-9._-]+$", options: .regularExpression) != nil,
+              !isInstalled(id)
+        else { return name }
+        do {
+            try Shell.run("cursor", ["--install-extension", id])
+            return name
+        } catch {
+            Log.append("  note   Cursor: \(id) failed to install, using the generated Omarchy theme. \(error.localizedDescription)")
+            return nil
+        }
     }
 
     private func registry() -> [[String: Any]] {
