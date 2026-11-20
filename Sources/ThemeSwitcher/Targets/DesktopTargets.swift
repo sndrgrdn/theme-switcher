@@ -36,7 +36,6 @@ struct DinkyTarget: ThemeTarget {
 
         let updated = lines.joined(separator: "\n")
         if updated != text { try Files.write(updated, to: config) }
-        try Shell.run("dinky", ["reload-config"])
     }
 
     private func strip(_ color: String?) -> String {
