@@ -62,14 +62,19 @@ enum ThemeApplier {
 
         let applied = AppliedTheme(theme: theme, background: background)
         Log.append("\(Date()) \(theme.id) background=\(background?.lastPathComponent ?? "none")")
+        var errors = [Error?](repeating: nil, count: targets.count)
+        let lock = NSLock()
+        DispatchQueue.concurrentPerform(iterations: targets.count) { index in
+            do { try targets[index].apply(applied) } catch { lock.withLock { errors[index] = error } }
+        }
+
         var failures: [TargetFailure] = []
-        for target in targets {
-            do {
-                try target.apply(applied)
-                Log.append("  ok     \(target.name)")
-            } catch {
+        for (target, error) in zip(targets, errors) {
+            if let error {
                 failures.append(TargetFailure(target: target.name, message: error.localizedDescription))
                 Log.append("  FAILED \(target.name): \(error.localizedDescription)")
+            } else {
+                Log.append("  ok     \(target.name)")
             }
         }
         return failures
