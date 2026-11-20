@@ -6,6 +6,7 @@ struct CursorTarget: ThemeTarget {
     let extensions = Paths.home.appendingPathComponent(".cursor/extensions")
     let generatedName = "omarchy-theme"
     let generatedID = "local.omarchy-theme"
+    private static var failedInstalls = Set<String>()
 
     func apply(_ applied: AppliedTheme) throws {
         guard Shell.which("cursor") != nil else { throw ShellError(message: "cursor CLI not found") }
@@ -34,10 +35,12 @@ struct CursorTarget: ThemeTarget {
               id.range(of: "^[a-zA-Z0-9._-]+$", options: .regularExpression) != nil,
               !isInstalled(id)
         else { return name }
+        guard !Self.failedInstalls.contains(id) else { return nil }
         do {
             try Shell.run("cursor", ["--install-extension", id])
             return name
         } catch {
+            Self.failedInstalls.insert(id)
             Log.append("  note   Cursor: \(id) failed to install, using the generated Omarchy theme. \(error.localizedDescription)")
             return nil
         }
