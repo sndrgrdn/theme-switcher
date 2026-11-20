@@ -2,11 +2,11 @@
 
 Theme Switcher brings [Omarchy](https://github.com/basecamp/omarchy)'s themes to macOS. Pick a theme from the menu bar or from a full-screen picker, and macOS, your wallpaper, and the apps you work in change to match.
 
-![The theme picker, showing Rose Pine selected among the other Omarchy themes](docs/picker.jpg)
+![The theme picker, showing Tokyo Night selected among the other Omarchy themes](docs/picker.jpg)
 
 ## What a theme changes
 
-Picking a theme applies it to every app below at the same time. An app that isn't installed shows up as a failure in the menu, and the other apps still change.
+Picking a theme applies it to every app below at the same time. Theme Switcher skips an app it can't find: SketchyBar, Rex, and Cursor need their command-line tool, dinky needs `dinky.toml`, and pi and Claude Code need their config folder. The menu warns only about apps that are installed but fail to change.
 
 | App | What changes |
 | --- | --- |
