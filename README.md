@@ -111,4 +111,4 @@ THEME_COLORS="$HOME/Library/Application Support/Theme Switcher/current/sketchyba
 
 ## License
 
-Theme Switcher is released under the [MIT License](LICENSE). The templates, the palette cascade, the template renderer, and the picker design are ported from Omarchy, also MIT licensed. Its notice is in the same file.
+Theme Switcher is released under the [MIT License](LICENSE). The templates, the palette cascade, the template renderer, and the picker design are ported from Omarchy, also MIT licensed. Its notice is in [NOTICE](NOTICE).
