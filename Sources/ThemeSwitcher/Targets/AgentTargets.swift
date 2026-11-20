@@ -3,6 +3,7 @@ import Foundation
 struct PiTarget: ThemeTarget {
     let name = "pi"
     let agent = Paths.home.appendingPathComponent(".pi/agent")
+    var isInstalled: Bool { FileManager.default.fileExists(atPath: agent.path) }
 
     func apply(_ applied: AppliedTheme) throws {
         try Files.write(String(contentsOf: applied.file("pi.json"), encoding: .utf8),
@@ -13,10 +14,11 @@ struct PiTarget: ThemeTarget {
 
 struct ClaudeCodeTarget: ThemeTarget {
     let name = "Claude Code"
+    let config = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"].map { URL(fileURLWithPath: $0) }
+        ?? Paths.home.appendingPathComponent(".claude")
+    var isInstalled: Bool { FileManager.default.fileExists(atPath: config.path) }
 
     func apply(_ applied: AppliedTheme) throws {
-        let config = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"].map { URL(fileURLWithPath: $0) }
-            ?? Paths.home.appendingPathComponent(".claude")
         try Files.write(String(contentsOf: applied.file("claude.json"), encoding: .utf8),
                         to: config.appendingPathComponent("themes/omarchy.json"))
         try setTheme("custom:omarchy", in: config.appendingPathComponent("settings.json"))

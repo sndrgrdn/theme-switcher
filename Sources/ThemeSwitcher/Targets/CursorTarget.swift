@@ -6,11 +6,10 @@ struct CursorTarget: ThemeTarget {
     let extensions = Paths.home.appendingPathComponent(".cursor/extensions")
     let generatedName = "omarchy-theme"
     let generatedID = "local.omarchy-theme"
+    var isInstalled: Bool { Shell.which("cursor") != nil }
     private static var failedInstalls = Set<String>()
 
     func apply(_ applied: AppliedTheme) throws {
-        guard Shell.which("cursor") != nil else { throw ShellError(message: "cursor CLI not found") }
-
         let colorTheme: String
         if let name = try extensionTheme(applied) {
             colorTheme = name

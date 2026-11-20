@@ -2,6 +2,7 @@ import Foundation
 
 struct SketchyBarTarget: ThemeTarget {
     let name = "SketchyBar"
+    var isInstalled: Bool { Shell.which("sketchybar") != nil }
 
     func apply(_ applied: AppliedTheme) throws {
         try Shell.run("sketchybar", ["--reload"])
@@ -11,6 +12,7 @@ struct SketchyBarTarget: ThemeTarget {
 struct DinkyTarget: ThemeTarget {
     let name = "dinky"
     let config = Paths.home.appendingPathComponent(".config/dinky/dinky.toml")
+    var isInstalled: Bool { FileManager.default.fileExists(atPath: config.path) }
 
     func apply(_ applied: AppliedTheme) throws {
         let colors = [
@@ -45,6 +47,7 @@ struct DinkyTarget: ThemeTarget {
 
 struct RexTarget: ThemeTarget {
     let name = "Rex"
+    var isInstalled: Bool { Shell.which("rex") != nil }
 
     func apply(_ applied: AppliedTheme) throws {
         let backup = Paths.backups.appendingPathComponent("com.superlogical.rex.plist")

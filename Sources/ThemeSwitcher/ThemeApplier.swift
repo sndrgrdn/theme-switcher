@@ -11,7 +11,12 @@ struct AppliedTheme {
 
 protocol ThemeTarget {
     var name: String { get }
+    var isInstalled: Bool { get }
     func apply(_ applied: AppliedTheme) throws
+}
+
+extension ThemeTarget {
+    var isInstalled: Bool { true }
 }
 
 struct TargetFailure {
@@ -62,15 +67,19 @@ enum ThemeApplier {
 
         let applied = AppliedTheme(theme: theme, background: background)
         Log.append("\(Date()) \(theme.id) background=\(background?.lastPathComponent ?? "none")")
+        let installed = targets.map(\.isInstalled)
         var errors = [Error?](repeating: nil, count: targets.count)
         let lock = NSLock()
         DispatchQueue.concurrentPerform(iterations: targets.count) { index in
+            guard installed[index] else { return }
             do { try targets[index].apply(applied) } catch { lock.withLock { errors[index] = error } }
         }
 
         var failures: [TargetFailure] = []
-        for (target, error) in zip(targets, errors) {
-            if let error {
+        for (index, target) in targets.enumerated() {
+            if !installed[index] {
+                Log.append("  skip   \(target.name): not installed")
+            } else if let error = errors[index] {
                 failures.append(TargetFailure(target: target.name, message: error.localizedDescription))
                 Log.append("  FAILED \(target.name): \(error.localizedDescription)")
             } else {
