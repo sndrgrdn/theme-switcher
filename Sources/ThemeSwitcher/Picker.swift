@@ -9,20 +9,58 @@ enum Carousel {
     static let topMargin: CGFloat = 30
     static let chromeHeight: CGFloat = 104
     static var step: CGFloat { slice.width + spacing }
-    static var height: CGFloat { topMargin + expanded.height + chromeHeight }
+
+    static func frame(relative: Int, previewX: CGFloat) -> CGRect {
+        let size = relative == 0 ? expanded : slice
+        let x: CGFloat = relative == 0 ? previewX
+            : relative < 0 ? previewX + CGFloat(relative) * step
+            : previewX + expanded.width + spacing + CGFloat(relative - 1) * step
+        return CGRect(x: x, y: (expanded.height - size.height) / 2, width: size.width, height: size.height)
+    }
+
+    static func contains(_ point: CGPoint, in rect: CGRect) -> Bool {
+        guard rect.minY...rect.maxY ~= point.y else { return false }
+        let shift = skew * (rect.maxY - point.y) / rect.height
+        return rect.minX + shift...rect.maxX - skew + shift ~= point.x
+    }
+
+    static var motion: Animation? {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .spring(duration: 0.22, bounce: 0)
+    }
 }
 
 final class PickerModel: ObservableObject {
     let themes: [Theme]
     let palette: Palette
-    let images: [String: NSImage]
-    @Published var query = ""
-    @Published var selectedID: String?
-    @Published var shown = false
+    @Published private(set) var images: [String: NSImage] = [:]
+    @Published private(set) var query = ""
+    @Published private(set) var selectedID: String?
+    @Published var hoveredID: String?
+    @Published var pressedID: String?
+    private var loading = true
 
-    init(themes: [Theme], current: String?, images: [String: NSImage]) {
+    var width: CGFloat = 0
+    var origin: CGPoint = .zero
+
+    var previewX: CGFloat { (width - Carousel.expanded.width) / 2 }
+
+    var radius: Int {
+        max(1, min(16, Int(((width - Carousel.expanded.width) / (2 * Carousel.step)).rounded(.up)) + 1))
+    }
+
+    func hit(_ point: CGPoint) -> Theme? {
+        let local = CGPoint(x: point.x - origin.x, y: point.y - origin.y)
+        let matching = matching
+        let position = matching.firstIndex { $0.id == selectedID } ?? 0
+        return matching.indices
+            .filter { abs($0 - position) <= radius }
+            .sorted { abs($0 - position) < abs($1 - position) }
+            .first { Carousel.contains(local, in: Carousel.frame(relative: $0 - position, previewX: previewX)) }
+            .map { matching[$0] }
+    }
+
+    init(themes: [Theme], current: String?) {
         self.themes = themes
-        self.images = images
         palette = themes.first { $0.id == current }?.palette ?? Palette(values: [:])
         selectedID = themes.first { $0.id == current }?.id ?? themes.first?.id
     }
@@ -35,11 +73,34 @@ final class PickerModel: ObservableObject {
 
     var selected: Theme? { matching.first { $0.id == selectedID } }
 
+    func loadImages() {
+        let order = themes.enumerated().sorted { lhs, rhs in
+            distance(lhs.offset) < distance(rhs.offset)
+        }.map(\.element)
+        if let first = order.first, let image = Previews.image(first) { images[first.id] = image }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            for theme in order.dropFirst() {
+                guard self?.loading == true else { return }
+                guard let image = Previews.image(theme) else { continue }
+                DispatchQueue.main.async { self?.images[theme.id] = image }
+            }
+        }
+    }
+
+    func stopLoading() {
+        loading = false
+    }
+
     func move(by direction: Int) {
         let matching = matching
         guard !matching.isEmpty else { return }
         let position = matching.firstIndex { $0.id == selectedID } ?? 0
-        selectedID = matching[(position + direction + matching.count) % matching.count].id
+        select(matching[(position + direction + matching.count) % matching.count])
+    }
+
+    func select(_ theme: Theme) {
+        guard theme.id != selectedID else { return }
+        withAnimation(Carousel.motion) { selectedID = theme.id }
     }
 
     func setQuery(_ next: String) {
@@ -48,13 +109,16 @@ final class PickerModel: ObservableObject {
         let all = themes.map(\.id)
         let start = selectedID.flatMap { all.firstIndex(of: $0) } ?? 0
         let ids = Set(matching.map(\.id))
-        let ordered = all[start...] + all[..<start]
-        if let next = ordered.first(where: ids.contains) { selectedID = next }
+        if let next = (all[start...] + all[..<start]).first(where: ids.contains) { selectedID = next }
     }
 
-    func color(_ key: String, _ fallback: Color, opacity: Double = 1) -> Color {
-        guard let (r, g, b) = palette[key].flatMap(Palette.rgb) else { return fallback.opacity(opacity) }
-        return Color(red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255).opacity(opacity)
+    func color(_ key: String, _ fallback: Color = .gray) -> Color {
+        guard let (r, g, b) = palette[key].flatMap(Palette.rgb) else { return fallback }
+        return Color(red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255)
+    }
+
+    private func distance(_ index: Int) -> Int {
+        abs(index - (themes.firstIndex { $0.id == selectedID } ?? 0))
     }
 }
 
@@ -74,91 +138,108 @@ struct Slant: Shape {
 
 struct PickerView: View {
     @ObservedObject var model: PickerModel
-    let width: CGFloat
-    let select: (Theme) -> Void
-    let cancel: () -> Void
-
-    private var radius: Int {
-        max(1, min(16, Int(((width - Carousel.expanded.width) / (2 * Carousel.step)).rounded(.up)) + 1))
-    }
 
     var body: some View {
-        let background = model.color("background", .black)
-        let foreground = model.color("foreground", .white)
         let matching = model.matching
         let position = matching.firstIndex { $0.id == model.selectedID } ?? 0
-        let visible = matching.indices.filter { abs($0 - position) <= radius }
+        let visible = matching.indices.filter { abs($0 - position) <= model.radius }
+        let previewX = model.previewX
 
         ZStack {
             Color.black.opacity(0.001)
-                .contentShape(Rectangle())
-                .onTapGesture(perform: cancel)
 
             VStack(spacing: 0) {
                 ZStack(alignment: .topLeading) {
+                    if !matching.isEmpty {
+                        Slant(skew: Carousel.skew)
+                            .fill(model.color("background", .black))
+                            .frame(width: Carousel.expanded.width, height: Carousel.expanded.height)
+                            .shadow(color: .black.opacity(0.35), radius: 32, y: 18)
+                            .offset(x: previewX)
+                            .zIndex(99)
+                    }
                     ForEach(visible, id: \.self) { index in
-                        card(matching[index], relative: index - position)
+                        Card(theme: matching[index], relative: index - position, model: model)
                     }
                 }
-                .frame(width: width, height: Carousel.expanded.height, alignment: .topLeading)
+                .frame(width: model.width, height: Carousel.expanded.height, alignment: .topLeading)
                 .padding(.top, Carousel.topMargin)
 
                 VStack(spacing: 8) {
-                    outlined(Text(model.selected?.name ?? (model.query.isEmpty ? "" : "No matches"))
-                        .font(.custom("TX-02", size: 24).weight(.semibold)), foreground, background)
-                    outlined(Text(model.query).font(.custom("TX-02", size: 14)), foreground.opacity(0.85), background)
-                        .opacity(model.query.isEmpty ? 0 : 1)
+                    label(model.selected?.name ?? (model.query.isEmpty ? "" : "No matches"), size: 24, weight: .semibold)
+                    label(model.query, size: 14, weight: .regular)
+                        .opacity(model.query.isEmpty ? 0 : 0.85)
                 }
                 .padding(.top, 16)
                 .frame(width: Carousel.expanded.width, height: Carousel.chromeHeight, alignment: .top)
             }
-            .opacity(model.shown ? 1 : 0)
-            .scaleEffect(model.shown ? 1 : 0.96)
         }
-        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: model.selectedID)
-        .animation(.spring(response: 0.32, dampingFraction: 0.86), value: model.query)
-        .animation(.easeOut(duration: 0.18), value: model.shown)
     }
 
-    private func card(_ theme: Theme, relative: Int) -> some View {
-        let selected = relative == 0
-        let size = selected ? Carousel.expanded : Carousel.slice
-        let previewX = (width - Carousel.expanded.width) / 2
-        let x: CGFloat = selected ? previewX
-            : relative < 0 ? previewX + CGFloat(relative) * Carousel.step
-            : previewX + Carousel.expanded.width + Carousel.spacing + CGFloat(relative - 1) * Carousel.step
-        let y: CGFloat = selected ? 0 : (Carousel.expanded.height - Carousel.slice.height) / 2
-        let shape = Slant(skew: Carousel.skew)
-        let background = model.color("background", .black)
+    private func label(_ text: String, size: CGFloat, weight: Font.Weight) -> some View {
+        let outline = model.color("background", .black).opacity(0.7)
+        return Text(text)
+            .font(.custom("TX-02", size: size).weight(weight))
+            .foregroundStyle(model.color("foreground", .white))
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .contentTransition(.identity)
+            .shadow(color: outline, radius: 0, x: 1, y: 1)
+            .shadow(color: outline, radius: 0, x: -1, y: -1)
+            .shadow(color: outline, radius: 2)
+    }
+}
 
-        return ZStack {
-            background
-            if let image = model.images[theme.id] {
+struct Card: View {
+    let theme: Theme
+    let relative: Int
+    @ObservedObject var model: PickerModel
+
+    var body: some View {
+        let selected = relative == 0
+        let frame = Carousel.frame(relative: relative, previewX: model.previewX)
+        let shape = Slant(skew: Carousel.skew)
+        let image = model.images[theme.id]
+        let hovering = model.hoveredID == theme.id
+        let pressed = model.pressedID == theme.id
+
+        ZStack {
+            if let image {
                 Image(nsImage: image)
                     .resizable()
                     .interpolation(.high)
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: size.width, height: size.height)
+                    .frame(width: Carousel.expanded.width, height: Carousel.expanded.height)
+                    .transition(.opacity)
+            } else {
+                swatches
             }
-            background.opacity(selected ? 0 : 0.42)
+            model.color("background", .black).opacity(selected ? 0 : hovering ? 0.2 : 0.42)
         }
-        .frame(width: size.width, height: size.height)
+        .frame(width: frame.width, height: frame.height)
         .clipShape(shape)
-        .overlay(shape.stroke(selected ? model.color("accent", .accentColor) : model.color("foreground", .white, opacity: 0.28),
+        .overlay(shape.stroke(selected ? model.color("accent", .accentColor) : model.color("foreground", .white).opacity(0.28),
                               lineWidth: selected ? 3 : 1))
-        .shadow(color: .black.opacity(selected ? 0.45 : 0.2), radius: selected ? 24 : 8, y: selected ? 12 : 4)
-        .contentShape(shape)
-        .onTapGesture { selected ? select(theme) : (model.selectedID = theme.id) }
-        .offset(x: x, y: y)
+        .scaleEffect(pressed ? 0.97 : 1)
+        .animation(.easeOut(duration: 0.16), value: pressed)
+        .animation(.easeOut(duration: 0.15), value: hovering)
+        .animation(.easeOut(duration: 0.15), value: image != nil)
+        .offset(x: frame.minX, y: frame.minY)
         .zIndex(selected ? 100 : Double(50 - min(abs(relative), 40)))
+        .allowsHitTesting(false)
     }
 
-    private func outlined(_ text: some View, _ color: Color, _ outline: Color) -> some View {
-        text.foregroundStyle(color)
-            .lineLimit(1)
-            .shadow(color: outline.opacity(0.7), radius: 0, x: 1, y: 1)
-            .shadow(color: outline.opacity(0.7), radius: 0, x: -1, y: -1)
-            .shadow(color: outline.opacity(0.7), radius: 2)
+    private var swatches: some View {
+        HStack(spacing: 0) {
+            ForEach(["background", "red", "yellow", "green", "cyan", "blue", "magenta", "foreground"], id: \.self) { key in
+                Rectangle().fill(color(key))
+            }
+        }
+    }
+
+    private func color(_ key: String) -> Color {
+        guard let (r, g, b) = theme.palette[key].flatMap(Palette.rgb) else { return .gray }
+        return Color(red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255)
     }
 }
 
@@ -168,8 +249,10 @@ final class PickerPanel: NSPanel {
 
 final class PickerController: NSObject, NSWindowDelegate {
     private var panel: PickerPanel?
-    private var monitor: Any?
+    private var monitors: [Any] = []
     private var model: PickerModel?
+    private var scrolled: CGFloat = 0
+    private var previous: NSRunningApplication?
     private let choose: (Theme) -> Void
 
     init(choose: @escaping (Theme) -> Void) {
@@ -178,10 +261,11 @@ final class PickerController: NSObject, NSWindowDelegate {
 
     var isOpen: Bool { panel != nil }
 
-    func open(themes: [Theme], current: String?, images: [String: NSImage]) {
+    func open(themes: [Theme], current: String?) {
         close()
         guard let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) ?? NSScreen.main else { return }
-        let model = PickerModel(themes: themes, current: current, images: images)
+        let model = PickerModel(themes: themes, current: current)
+        model.loadImages()
         let panel = PickerPanel(contentRect: screen.frame, styleMask: [.borderless, .nonactivatingPanel],
                                 backing: .buffered, defer: false)
         panel.isOpaque = false
@@ -189,31 +273,47 @@ final class PickerController: NSObject, NSWindowDelegate {
         panel.hasShadow = false
         panel.level = .popUpMenu
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.becomesKeyOnlyIfNeeded = false
         panel.delegate = self
-        let width = min(screen.frame.width - 80, Carousel.expanded.width + 13 * Carousel.step + 40)
-        panel.contentView = NSHostingView(rootView: PickerView(
-            model: model, width: width,
-            select: { [weak self] in self?.pick($0) },
-            cancel: { [weak self] in self?.close() }
-        ).frame(width: screen.frame.width, height: screen.frame.height))
-        panel.setFrame(screen.frame, display: false)
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            self?.handle(event) == true ? nil : event
-        }
+        model.width = min(screen.frame.width - 80, Carousel.expanded.width + 13 * Carousel.step + 40)
+        let contentHeight = Carousel.topMargin + Carousel.expanded.height + Carousel.chromeHeight
+        model.origin = CGPoint(x: (screen.frame.width - model.width) / 2,
+                               y: (screen.frame.height - contentHeight) / 2 + Carousel.topMargin)
+        panel.acceptsMouseMovedEvents = true
+        panel.contentView = NSHostingView(rootView: PickerView(model: model)
+            .frame(width: screen.frame.width, height: screen.frame.height))
+        panel.setFrame(screen.frame, display: true)
+        monitors = [
+            NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                self?.handleKey(event) == true ? nil : event
+            },
+            NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+                self?.handleScroll(event)
+                return nil
+            },
+            NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .leftMouseDown, .leftMouseDragged, .leftMouseUp]) { [weak self] event in
+                self?.handleMouse(event)
+                return nil
+            },
+        ].compactMap { $0 }
         self.model = model
         self.panel = panel
-        NSApp.activate(ignoringOtherApps: true)
+        previous = NSWorkspace.shared.frontmostApplication.flatMap { $0 == .current ? nil : $0 }
+        NSApp.activate()
         panel.makeKeyAndOrderFront(nil)
-        DispatchQueue.main.async { model.shown = true }
     }
 
     func close() {
-        if let monitor { NSEvent.removeMonitor(monitor) }
-        monitor = nil
+        monitors.forEach(NSEvent.removeMonitor)
+        monitors = []
+        model?.stopLoading()
         panel?.delegate = nil
         panel?.orderOut(nil)
         panel = nil
         model = nil
+        scrolled = 0
+        if NSApp.isActive { previous?.activate() }
+        previous = nil
     }
 
     func windowDidResignKey(_ notification: Notification) {
@@ -225,7 +325,44 @@ final class PickerController: NSObject, NSWindowDelegate {
         choose(theme)
     }
 
-    private func handle(_ event: NSEvent) -> Bool {
+    private func handleMouse(_ event: NSEvent) {
+        guard let model, let panel, event.window == panel, let view = panel.contentView else { return }
+        let location = view.convert(event.locationInWindow, from: nil)
+        let point = CGPoint(x: location.x, y: view.isFlipped ? location.y : view.bounds.height - location.y)
+        let theme = model.hit(point)
+        switch event.type {
+        case .mouseMoved, .leftMouseDragged:
+            if model.hoveredID != theme?.id { model.hoveredID = theme?.id }
+            if model.pressedID != nil, model.pressedID != theme?.id { model.pressedID = nil }
+        case .leftMouseDown:
+            model.pressedID = theme?.id
+        case .leftMouseUp:
+            let pressed = model.pressedID
+            model.pressedID = nil
+            guard let theme else { return close() }
+            guard theme.id == pressed else { return }
+            theme.id == model.selectedID ? pick(theme) : model.select(theme)
+        default:
+            break
+        }
+    }
+
+    private func handleScroll(_ event: NSEvent) {
+        guard let model else { return }
+        let delta = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) ? -event.scrollingDeltaX : -event.scrollingDeltaY
+        guard event.hasPreciseScrollingDeltas else {
+            if delta != 0 { model.move(by: delta > 0 ? 1 : -1) }
+            return
+        }
+        if event.phase == .began { scrolled = 0 }
+        scrolled += delta
+        while abs(scrolled) >= 40 {
+            model.move(by: scrolled > 0 ? 1 : -1)
+            scrolled -= scrolled > 0 ? 40 : -40
+        }
+    }
+
+    private func handleKey(_ event: NSEvent) -> Bool {
         guard let model else { return false }
         let modifiers = event.modifierFlags.intersection([.command, .control, .option])
         switch event.keyCode {

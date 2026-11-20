@@ -1,6 +1,5 @@
 import AppKit
 import Carbon
-import ImageIO
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -8,7 +7,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var picker = PickerController { [weak self] in self?.apply($0) }
     private var hotKey: HotKey?
     private var themes: [Theme] = []
-    private var previews: [String: NSImage] = [:]
     private var status: String?
     private var failures: [TargetFailure] = []
 
@@ -35,21 +33,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func reload() {
         themes = ThemeLibrary.load()
-        let missing = themes.filter { previews[$0.id] == nil }
-        DispatchQueue.global(qos: .utility).async {
-            let loaded = missing.compactMap { theme in theme.preview.flatMap(self.thumbnail).map { (theme.id, $0) } }
-            DispatchQueue.main.async { self.previews.merge(loaded) { $1 } }
-        }
-    }
-
-    private func thumbnail(_ url: URL) -> NSImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                  kCGImageSourceCreateThumbnailFromImageAlways: true,
-                  kCGImageSourceThumbnailMaxPixelSize: 1600,
-              ] as CFDictionary)
-        else { return nil }
-        return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+        let themes = themes
+        DispatchQueue.global(qos: .utility).async { Previews.warm(themes) }
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -84,7 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openPicker() {
         reload()
-        picker.open(themes: themes, current: ThemeState.load().theme, images: previews)
+        picker.open(themes: themes, current: ThemeState.load().theme)
     }
 
     private func togglePicker() {
