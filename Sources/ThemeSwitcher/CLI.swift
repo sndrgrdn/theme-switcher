@@ -11,6 +11,8 @@ enum CLI {
                          Setting the current theme again moves to its next background.
           picker         Open the theme picker.
           update         Fetch the latest themes from Omarchy.
+          skill setup    Install the agent skill for Claude Code, Codex, OpenCode, and pi.
+                         skill status, skill remove, and skill show manage it.
 
         --json prints the app's reply as JSON.
         Exit status: 0 on success, 1 when the command or an app failed, 2 on a usage error.
@@ -30,6 +32,8 @@ enum CLI {
         case ("picker", 1): request = .picker
         case ("update", 1): request = .update
         case ("set", 2...): request = .set(theme: words.dropFirst().joined(separator: " "))
+        case ("skill", _):
+            return Skill.run(Array(words.dropFirst()))
         case ("help", _), ("--help", _), ("-h", _):
             print(usage)
             return 0
