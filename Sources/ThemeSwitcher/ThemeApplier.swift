@@ -90,6 +90,7 @@ enum ThemeApplier {
         PiTarget(),
         ClaudeCodeTarget(),
         OpencodeTarget(),
+        HerdrTarget(),
     ]
 
     static func apply(_ theme: Theme) throws -> ApplyReport {

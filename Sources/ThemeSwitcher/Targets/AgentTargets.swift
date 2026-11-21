@@ -56,7 +56,7 @@ struct OpencodeTarget: ThemeTarget {
     }
 }
 
-private func setTheme(_ theme: String, in settings: URL) throws {
+func setTheme(_ theme: String, in settings: URL) throws {
     let text = (try? String(contentsOf: settings, encoding: .utf8)) ?? "{\n}\n"
     let updated = Files.setJSONString("theme", theme, in: text)
     let parsed = try? JSONSerialization.jsonObject(with: Data(updated.utf8)) as? [String: Any]

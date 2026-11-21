@@ -65,3 +65,16 @@ struct RexTarget: ThemeTarget {
         try Shell.run("rex", ["do", "client.setting.interface.appearance.scheme", "value=\(applied.theme.mode.rawValue)"])
     }
 }
+
+struct HerdrTarget: ThemeTarget {
+    let name = "Herdr"
+    let home = ProcessInfo.processInfo.environment["HERDR_APP_HOME"].map { URL(fileURLWithPath: $0) }
+        ?? Paths.home.appendingPathComponent(".config/herdr-app")
+    var isInstalled: Bool { FileManager.default.fileExists(atPath: home.path) }
+
+    func apply(_ applied: AppliedTheme) throws {
+        try Files.write(String(contentsOf: applied.file("herdr-app.json"), encoding: .utf8),
+                        to: home.appendingPathComponent("themes/omarchy.json"))
+        try setTheme("omarchy", in: home.appendingPathComponent("settings.json"))
+    }
+}
