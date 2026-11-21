@@ -6,7 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let queue = DispatchQueue(label: "theme-switcher.apply")
     private lazy var picker = PickerController { [weak self] in self?.apply($0) }
-    private var hotKey: HotKey?
+    private var hotKeys: [HotKey] = []
     private var themes: [Theme] = []
     private var status: String?
     private var results: [TargetResult] = []
@@ -16,10 +16,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = NSMenu()
         statusItem.menu?.delegate = self
 
-        hotKey = HotKey(keyCode: kVK_Space, modifiers: controlKey | optionKey | cmdKey) { [weak self] in
-            self?.togglePicker()
+        let shortcuts: [(key: Int, modifiers: Int, label: String, action: () -> Void)] = [
+            (kVK_Space, controlKey | optionKey | cmdKey, "⌃⌥⌘Space", { [weak self] in self?.togglePicker() }),
+            (kVK_Space, controlKey | optionKey | shiftKey | cmdKey, "⌃⌥⇧⌘Space", { [weak self] in self?.showBackground { $0 + 1 } }),
+        ]
+        var taken: [String] = []
+        for shortcut in shortcuts {
+            if let hotKey = HotKey(keyCode: shortcut.key, modifiers: shortcut.modifiers, action: shortcut.action) {
+                hotKeys.append(hotKey)
+            } else {
+                taken.append(shortcut.label)
+            }
         }
-        if hotKey == nil { status = "⌃⌥⌘Space is taken by another app" }
+        if !taken.isEmpty { status = "\(taken.joined(separator: ", ")) taken by another app" }
 
         NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleURL(_:reply:)),
                                                      forEventClass: AEEventClass(kInternetEventClass),
@@ -61,12 +70,61 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(item)
         }
         menu.addItem(.separator())
+        if let theme = themes.first(where: { $0.id == current }), !theme.backgrounds.isEmpty {
+            menu.addItem(backgroundMenu(for: theme))
+        }
         menu.addItem(action: "Open Picker…", #selector(openPicker), target: self)
         menu.addItem(action: "Update Themes", #selector(chooseUpdateThemes), target: self)
         menu.addItem(.separator())
         let login = menu.addItem(action: "Start at Login", #selector(toggleStartAtLogin), target: self)
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menu.addItem(action: "Quit", #selector(NSApplication.terminate(_:)), target: NSApp)
+    }
+
+    private func backgroundMenu(for theme: Theme) -> NSMenuItem {
+        let submenu = NSMenu()
+        let next = submenu.addItem(action: "Next Background", #selector(chooseNextBackground), target: self)
+        next.keyEquivalent = " "
+        next.keyEquivalentModifierMask = [.control, .option, .shift, .command]
+        submenu.addItem(action: "Previous Background", #selector(choosePreviousBackground), target: self)
+        submenu.addItem(.separator())
+        let selected = ThemeState.load().backgrounds[theme.id]
+        for (index, background) in theme.backgrounds.enumerated() {
+            let item = submenu.addItem(action: background.deletingPathExtension().lastPathComponent,
+                                       #selector(chooseBackground(_:)), target: self)
+            item.representedObject = index
+            item.state = index == selected ? .on : .off
+        }
+        let item = NSMenuItem(title: "Background", action: nil, keyEquivalent: "")
+        item.submenu = submenu
+        return item
+    }
+
+    @objc private func chooseNextBackground() {
+        showBackground { $0 + 1 }
+    }
+
+    @objc private func choosePreviousBackground() {
+        showBackground { $0 - 1 }
+    }
+
+    @objc private func chooseBackground(_ sender: NSMenuItem) {
+        guard let index = sender.representedObject as? Int else { return }
+        showBackground { _ in index }
+    }
+
+    private func showBackground(_ pick: @escaping (Int) -> Int,
+                                then completion: ((Result<(theme: String, background: URL), Error>) -> Void)? = nil) {
+        queue.async {
+            let result = Result { try ThemeApplier.showBackground(pick) }
+            DispatchQueue.main.async {
+                switch result {
+                case .success: self.status = nil
+                case .failure(let error): self.status = "Background failed: \(error.localizedDescription)"
+                }
+                completion?(result)
+            }
+        }
     }
 
     @objc private func chooseTheme(_ sender: NSMenuItem) {
@@ -147,6 +205,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return ControlResponse()
         case .update:
             return wait { done in self.updateThemes { done($0.map(ControlResponse.failure) ?? ControlResponse()) } }
+        case .background(let step):
+            return wait { done in
+                self.showBackground({ $0 + step }) { result in
+                    switch result {
+                    case .success(let shown): done(ControlResponse(current: shown.theme, background: shown.background.lastPathComponent))
+                    case .failure(let error): done(.failure(error.localizedDescription))
+                    }
+                }
+            }
         case .set(let name):
             guard let theme = DispatchQueue.main.sync(execute: { self.theme(named: name) }) else {
                 return .failure("no theme named \(name)")
@@ -183,6 +250,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
               let url = URL(string: string) else { return }
         switch url.host {
         case "picker": openPicker()
+        case "background":
+            let step = url.lastPathComponent == "previous" ? -1 : 1
+            showBackground { $0 + step }
         case "set":
             if let theme = theme(named: url.lastPathComponent.removingPercentEncoding ?? "") { apply(theme) }
         default: break

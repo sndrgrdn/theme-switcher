@@ -9,6 +9,8 @@ enum CLI {
           current        Print the current theme and its background.
           set <theme>    Apply a theme by id or name, and wait until every app has it.
                          Setting the current theme again moves to its next background.
+          background [next | previous]
+                         Show the current theme's next or previous background. Defaults to next.
           picker         Open the theme picker.
           update         Fetch the latest themes from Omarchy.
           skill setup    Install the agent skill for Claude Code, Codex, OpenCode, and pi.
@@ -31,6 +33,9 @@ enum CLI {
         case ("current", 1): request = .current
         case ("picker", 1): request = .picker
         case ("update", 1): request = .update
+        case ("background", 1): request = .background(step: 1)
+        case ("background", 2) where words.last == "next": request = .background(step: 1)
+        case ("background", 2) where words.last == "previous": request = .background(step: -1)
         case ("set", 2...): request = .set(theme: words.dropFirst().joined(separator: " "))
         case ("skill", _):
             return Skill.run(Array(words.dropFirst()))

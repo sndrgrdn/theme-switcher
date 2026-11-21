@@ -3,6 +3,7 @@ import Foundation
 enum ControlRequest: Codable {
     case list, current, picker, update
     case set(theme: String)
+    case background(step: Int)
 }
 
 struct ThemeSummary: Codable {

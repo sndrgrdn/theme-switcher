@@ -135,6 +135,20 @@ enum ThemeApplier {
         return ApplyReport(theme: theme.id, background: background?.lastPathComponent, results: results)
     }
 
+    static func showBackground(_ pick: (Int) -> Int) throws -> (theme: String, background: URL) {
+        var state = ThemeState.load()
+        guard let id = state.theme, let theme = ThemeLibrary.theme(id) else { throw ShellError(message: "no theme applied yet") }
+        guard !theme.backgrounds.isEmpty else { throw ShellError(message: "\(theme.name) has no backgrounds") }
+        let count = theme.backgrounds.count
+        let index = (pick(state.backgrounds[id] ?? 0) % count + count) % count
+        let background = theme.backgrounds[index]
+        try DispatchQueue.main.sync { try WallpaperTarget.show(background) }
+        state.backgrounds[id] = index
+        try state.save()
+        Log.append("\(Date()) \(id) background=\(background.lastPathComponent)")
+        return (id, background)
+    }
+
     private static func stage(_ theme: Theme) throws {
         let fm = FileManager.default
         try? fm.removeItem(at: Paths.next)

@@ -16,7 +16,7 @@ enum Skill {
 
         ## Apply it
 
-        1. Run `theme-switcher current --json`. When `current` is already the theme the user wants, tell them so and stop. Setting the current theme again moves it to its next wallpaper, so run `set` on the current theme only when the user asks for another wallpaper.
+        1. Run `theme-switcher current --json`. When `current` is already the theme the user wants, tell them so and stop. Don't run `set` on the current theme to change its wallpaper. Use `background` instead.
         2. Run `theme-switcher set <id> --json`. The command returns after every app has the theme.
         3. Read `report.results`. Each entry has a `target` and a `status`:
            - `applied`: the app has the theme.
@@ -27,6 +27,7 @@ enum Skill {
 
         ## Other commands
 
+        - `theme-switcher background [next | previous] --json` changes only the wallpaper, to the current theme's next or previous background. It returns `current` and `background`.
         - `theme-switcher picker` opens the picker for the user. It returns at once and doesn't report their choice.
         - `theme-switcher update` fetches the latest themes from Omarchy. It needs the network and can take a while.
 

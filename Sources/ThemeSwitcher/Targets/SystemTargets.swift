@@ -31,7 +31,7 @@ struct WallpaperTarget: ThemeTarget {
         try? show(theme.backgrounds[index])
     }
 
-    private static func show(_ background: URL) throws {
+    static func show(_ background: URL) throws {
         for screen in NSScreen.screens where NSWorkspace.shared.desktopImageURL(for: screen) != background {
             try NSWorkspace.shared.setDesktopImageURL(background, for: screen, options: [:])
         }

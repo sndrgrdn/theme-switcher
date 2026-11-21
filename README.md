@@ -11,7 +11,7 @@ Picking a theme applies it to every app below at the same time. Theme Switcher s
 | App | Detected by | What changes |
 | --- | --- | --- |
 | macOS | Always applied | Light or dark mode, through System Events. |
-| Wallpaper | Always applied | The theme's background on every display. Pick the same theme again to move to its next background. |
+| Wallpaper | Always applied | The theme's background on every display. See [Change the background](#change-the-background). |
 | [SketchyBar](https://github.com/FelixKratz/SketchyBar) | `sketchybar` | Colour variables in `sketchybar.sh`, then `sketchybar --reload`. See [Connect SketchyBar](#connect-sketchybar). |
 | dinky | `~/.config/dinky/dinky.toml` | `active-color` and `inactive-color` in the file's `[borders]` section. |
 | Rex | `rex` | Imports the theme as `Omarchy <Theme>` and sets Rex's colour scheme to light or dark. |
@@ -76,6 +76,16 @@ Press <kbd>⌃⌥⌘Space</kbd> to open the picker. Press it again to close it.
 
 The menu bar icon also lists every theme, and **Update Themes** fetches the latest themes from Omarchy.
 
+## Change the background
+
+Most themes come with several backgrounds. To change only the wallpaper and leave every app as it is:
+
+- Press <kbd>⌃⌥⇧⌘Space</kbd> for the next background.
+- Choose a background from **Background** in the menu bar icon's menu.
+- Run `theme-switcher background`, or `theme-switcher background previous`.
+
+Picking the current theme again also moves to its next background, but it reapplies the theme to every app.
+
 ## Use the command line
 
 `build-app.sh` links the `theme-switcher` command into `~/.local/bin`. The command sends each request to the running app and waits for the reply. When the app isn't running, the command starts it in the background.
@@ -84,6 +94,7 @@ The menu bar icon also lists every theme, and **Update Themes** fetches the late
 theme-switcher list              # * marks the current theme
 theme-switcher current           # the current theme and its background
 theme-switcher set tokyo-night   # apply a theme and wait until every app has it
+theme-switcher background        # show the next background; add previous for the one before
 theme-switcher picker            # open the picker
 theme-switcher update            # fetch the latest themes from Omarchy
 ```
@@ -133,6 +144,7 @@ Apps that only need to start an action can use the `theme-switcher` URL scheme:
 ```sh
 open "theme-switcher://picker"
 open "theme-switcher://set/tokyo-night"
+open "theme-switcher://background/next"
 ```
 
 ## Add your own themes
