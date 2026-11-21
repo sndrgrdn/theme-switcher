@@ -6,22 +6,24 @@ Theme Switcher brings [Omarchy](https://github.com/basecamp/omarchy)'s themes to
 
 ## What a theme changes
 
-Picking a theme applies it to every app below at the same time. Theme Switcher skips an app it can't find: SketchyBar, Rex, Cursor, and Hunk need their command-line tool, dinky needs `dinky.toml`, pi, Claude Code, OpenCode, and Herdr need their config folder, and Ghostty needs `Ghostty.app` in `/Applications` or `~/Applications`. The menu warns only about apps that are installed but fail to change.
+Picking a theme applies it to every app below at the same time. Theme Switcher skips an app when it can't find what the **Detected by** column names. It looks for command-line tools in `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin`, `/bin`, `~/.local/bin`, `~/.hunk/bin`, and Rex's install folder, not in your shell's `PATH`. The menu warns only about apps that are installed but fail to change.
 
-| App | What changes |
-| --- | --- |
-| macOS | Light or dark mode, through System Events. |
-| Wallpaper | The theme's background on every display. Pick the same theme again to move to its next background. |
-| [SketchyBar](https://github.com/FelixKratz/SketchyBar) | Colour variables in `sketchybar.sh`, then `sketchybar --reload`. See [Connect SketchyBar](#connect-sketchybar). |
-| dinky | `active-color` and `inactive-color` in the `[borders]` section of `~/.config/dinky/dinky.toml`. |
-| Rex | Imports the theme as `Omarchy <Theme>` and sets Rex's colour scheme to light or dark. |
-| [Cursor](https://cursor.com) | Installs the theme's own extension, or a generated `Omarchy` theme when there is none, and selects it in `settings.json`. |
-| [pi](https://github.com/earendil-works/pi) | Writes `~/.pi/agent/themes/omarchy-system.json` and selects it in `settings.json`. |
-| [Claude Code](https://claude.com/claude-code) | Writes `themes/omarchy.json` in `$CLAUDE_CONFIG_DIR` or `~/.claude`, and selects `custom:omarchy` in `settings.json`. |
-| [OpenCode](https://opencode.ai) | Writes `themes/omarchy.json` in `$XDG_CONFIG_HOME/opencode` or `~/.config/opencode`, selects it in `cli.json`, and signals running `opencode` processes to reload. |
-| [Herdr](https://herdr.dev) | Writes `themes/omarchy.json` in `$HERDR_APP_HOME` or `~/.config/herdr-app`, and selects it in `settings.json`. |
-| [Ghostty](https://ghostty.org) | Points `theme` in Ghostty's config at the generated `ghostty.conf`, then signals Ghostty to reload. |
-| [Hunk](https://github.com/modem-dev/hunk) | Signals running Hunk sessions to read the terminal's new colours. Hunk follows them with its `terminal` theme. |
+| App | Detected by | What changes |
+| --- | --- | --- |
+| macOS | Always applied | Light or dark mode, through System Events. |
+| Wallpaper | Always applied | The theme's background on every display. Pick the same theme again to move to its next background. |
+| [SketchyBar](https://github.com/FelixKratz/SketchyBar) | `sketchybar` | Colour variables in `sketchybar.sh`, then `sketchybar --reload`. See [Connect SketchyBar](#connect-sketchybar). |
+| dinky | `~/.config/dinky/dinky.toml` | `active-color` and `inactive-color` in the file's `[borders]` section. |
+| Rex | `rex` | Imports the theme as `Omarchy <Theme>` and sets Rex's colour scheme to light or dark. |
+| [Cursor](https://cursor.com) | `cursor` | Installs the theme's own extension, or a generated `Omarchy` theme when there is none, and selects it in `settings.json`. |
+| [pi](https://github.com/earendil-works/pi) | `~/.pi/agent` | Writes `themes/omarchy-system.json` and selects it in `settings.json`. |
+| [Claude Code](https://claude.com/claude-code) | `$CLAUDE_CONFIG_DIR` or `~/.claude` | Writes `themes/omarchy.json` and selects `custom:omarchy` in `settings.json`. |
+| [OpenCode](https://opencode.ai) | `$XDG_CONFIG_HOME/opencode` or `~/.config/opencode` | Writes `themes/omarchy.json`, selects it in `cli.json`, and signals running OpenCode sessions to reload it. Needs OpenCode 2 or later. |
+| [Herdr](https://herdr.dev) | `$HERDR_APP_HOME` or `~/.config/herdr-app` | Writes `themes/omarchy.json` and selects it in `settings.json`. Herdr 0.1.11 and later reload it while they run. |
+| [Ghostty](https://ghostty.org) | `Ghostty.app` in `/Applications` or `~/Applications` | Points `theme` in Ghostty's config at the generated `ghostty.conf`, then signals Ghostty to reload. Needs Ghostty 1.2 or later, because earlier versions quit on that signal. |
+| [Hunk](https://github.com/modem-dev/hunk) | `hunk` | Signals running Hunk sessions to read the terminal's new colours. Set `theme = "terminal"` in Hunk's config so that Hunk uses them. |
+
+Chrome, Helium, and other Chromium browsers aren't themed. Omarchy sets their colour through a browser policy. On macOS, a browser applies that policy only when an administrator writes it, and only when the browser starts.
 
 Before Theme Switcher changes one of your config files for the first time, it copies the original to `~/Library/Application Support/Theme Switcher/backups`.
 
