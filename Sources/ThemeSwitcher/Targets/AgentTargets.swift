@@ -52,7 +52,7 @@ struct OpencodeTarget: ThemeTarget {
             try Files.write(String(decoding: data, as: UTF8.self) + "\n", to: cli)
         }
 
-        Shell.signal(SIGUSR2, to: "opencode")
+        Shell.signal(SIGUSR2, to: "opencode", onlyWithTerminal: true)
     }
 }
 
