@@ -2,7 +2,7 @@
 
 Theme Switcher brings [Omarchy](https://github.com/basecamp/omarchy)'s themes to macOS. Pick a theme from the menu bar or from a full-screen picker, and macOS, your wallpaper, and the apps you work in change to match.
 
-![The theme picker, showing Last Horizon selected among the other Omarchy themes](docs/picker-last-horizon.jpg)
+![The theme picker, showing Solitude selected among the other Omarchy themes](docs/picker-solitude.jpg)
 
 ## What a theme changes
 
