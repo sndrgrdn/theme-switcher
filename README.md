@@ -6,7 +6,7 @@ Theme Switcher brings [Omarchy](https://github.com/basecamp/omarchy)'s themes to
 
 ## What a theme changes
 
-Picking a theme applies it to every app below at the same time. Theme Switcher skips an app it can't find: SketchyBar, Rex, and Cursor need their command-line tool, dinky needs `dinky.toml`, pi, Claude Code, OpenCode, and Herdr need their config folder, and Ghostty needs `Ghostty.app` in `/Applications` or `~/Applications`. The menu warns only about apps that are installed but fail to change.
+Picking a theme applies it to every app below at the same time. Theme Switcher skips an app it can't find: SketchyBar, Rex, Cursor, and Hunk need their command-line tool, dinky needs `dinky.toml`, pi, Claude Code, OpenCode, and Herdr need their config folder, and Ghostty needs `Ghostty.app` in `/Applications` or `~/Applications`. The menu warns only about apps that are installed but fail to change.
 
 | App | What changes |
 | --- | --- |
@@ -21,6 +21,7 @@ Picking a theme applies it to every app below at the same time. Theme Switcher s
 | [OpenCode](https://opencode.ai) | Writes `themes/omarchy.json` in `$XDG_CONFIG_HOME/opencode` or `~/.config/opencode`, selects it in `cli.json`, and signals running `opencode` processes to reload. |
 | [Herdr](https://herdr.dev) | Writes `themes/omarchy.json` in `$HERDR_APP_HOME` or `~/.config/herdr-app`, and selects it in `settings.json`. |
 | [Ghostty](https://ghostty.org) | Points `theme` in Ghostty's config at the generated `ghostty.conf`, then signals Ghostty to reload. |
+| [Hunk](https://github.com/modem-dev/hunk) | Signals running Hunk sessions to read the terminal's new colours. Hunk follows them with its `terminal` theme. |
 
 Before Theme Switcher changes one of your config files for the first time, it copies the original to `~/Library/Application Support/Theme Switcher/backups`.
 

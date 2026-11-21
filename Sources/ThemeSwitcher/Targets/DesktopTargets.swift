@@ -113,3 +113,13 @@ struct GhosttyTarget: ThemeTarget {
         Shell.signal(SIGUSR2, to: "ghostty")
     }
 }
+
+struct HunkTarget: ThemeTarget {
+    let name = "Hunk"
+    var isInstalled: Bool { Shell.which("hunk") != nil }
+
+    func apply(_ applied: AppliedTheme) throws {
+        Shell.signal(SIGWINCH, to: "hunk")
+        DispatchQueue.global().asyncAfter(deadline: .now() + 1) { Shell.signal(SIGWINCH, to: "hunk") }
+    }
+}

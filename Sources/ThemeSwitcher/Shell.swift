@@ -9,6 +9,7 @@ enum Shell {
     static let searchPath = [
         "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin",
         Paths.home.appendingPathComponent(".local/bin").path,
+        Paths.home.appendingPathComponent(".hunk/bin").path,
         Paths.home.appendingPathComponent("Library/Application Support/com.superlogical.rex/RexServer/Versions/Current/Rex Server.app/Contents/MacOS").path,
     ]
 
