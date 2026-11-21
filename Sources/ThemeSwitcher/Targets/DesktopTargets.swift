@@ -78,3 +78,38 @@ struct HerdrTarget: ThemeTarget {
         try setTheme("omarchy", in: home.appendingPathComponent("settings.json"))
     }
 }
+
+struct GhosttyTarget: ThemeTarget {
+    let name = "Ghostty"
+    var isInstalled: Bool {
+        [URL(fileURLWithPath: "/Applications"), Paths.home.appendingPathComponent("Applications")]
+            .contains { FileManager.default.fileExists(atPath: $0.appendingPathComponent("Ghostty.app").path) }
+    }
+
+    func apply(_ applied: AppliedTheme) throws {
+        let xdg = ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"].map { URL(fileURLWithPath: $0) }
+        let directories = [xdg, Paths.home.appendingPathComponent(".config")].compactMap { $0?.appendingPathComponent("ghostty") }
+            + [Paths.home.appendingPathComponent("Library/Application Support/com.mitchellh.ghostty")]
+        let config = directories.flatMap { [$0.appendingPathComponent("config.ghostty"), $0.appendingPathComponent("config")] }
+            .first { FileManager.default.fileExists(atPath: $0.path) }
+            ?? Paths.home.appendingPathComponent(".config/ghostty/config")
+
+        let line = "theme = \"\(applied.file("ghostty.conf").path)\""
+        let text = (try? String(contentsOf: config, encoding: .utf8)) ?? ""
+        var lines = text.components(separatedBy: "\n")
+        var replaced = false
+        for (index, existing) in lines.enumerated()
+        where existing.range(of: #"^\s*theme\s*="#, options: .regularExpression) != nil {
+            lines[index] = line
+            replaced = true
+        }
+        if !replaced {
+            if lines.last == "" { lines.removeLast() }
+            lines += [line, ""]
+        }
+
+        let updated = lines.joined(separator: "\n")
+        if updated != text { try Files.write(updated, to: config) }
+        Shell.signal(SIGUSR2, to: "ghostty")
+    }
+}

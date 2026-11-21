@@ -91,6 +91,7 @@ enum ThemeApplier {
         ClaudeCodeTarget(),
         OpencodeTarget(),
         HerdrTarget(),
+        GhosttyTarget(),
     ]
 
     static func apply(_ theme: Theme) throws -> ApplyReport {
