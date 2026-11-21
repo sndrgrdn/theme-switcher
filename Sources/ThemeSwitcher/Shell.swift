@@ -38,4 +38,15 @@ enum Shell {
         }
         return text
     }
+
+    static func signal(_ signal: Int32, to name: String) {
+        var pids = [pid_t](repeating: 0, count: Int(proc_listallpids(nil, 0)) + 64)
+        let count = Int(proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size)))
+        for pid in pids.prefix(max(count, 0)) where pid > 0 {
+            var buffer = [CChar](repeating: 0, count: 64)
+            if proc_name(pid, &buffer, UInt32(buffer.count)) > 0, String(cString: buffer) == name {
+                kill(pid, signal)
+            }
+        }
+    }
 }

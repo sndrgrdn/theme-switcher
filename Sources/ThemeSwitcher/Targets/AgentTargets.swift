@@ -25,6 +25,37 @@ struct ClaudeCodeTarget: ThemeTarget {
     }
 }
 
+struct OpencodeTarget: ThemeTarget {
+    let name = "OpenCode"
+    let config = (ProcessInfo.processInfo.environment["XDG_CONFIG_HOME"].map { URL(fileURLWithPath: $0) }
+        ?? Paths.home.appendingPathComponent(".config")).appendingPathComponent("opencode")
+    var isInstalled: Bool { FileManager.default.fileExists(atPath: config.path) }
+
+    func apply(_ applied: AppliedTheme) throws {
+        try Files.write(String(contentsOf: applied.file("opencode.json"), encoding: .utf8),
+                        to: config.appendingPathComponent("themes/omarchy.json"))
+
+        let cli = config.appendingPathComponent("cli.json")
+        var settings: [String: Any] = [:]
+        if let data = try? Data(contentsOf: cli) {
+            guard let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                throw ShellError(message: "could not parse \(cli.path)")
+            }
+            settings = parsed
+        }
+        var theme = settings["theme"] as? [String: Any] ?? [:]
+        if theme["name"] as? String != "omarchy" {
+            theme["name"] = "omarchy"
+            settings["theme"] = theme
+            let data = try JSONSerialization.data(withJSONObject: settings,
+                                                  options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+            try Files.write(String(decoding: data, as: UTF8.self) + "\n", to: cli)
+        }
+
+        Shell.signal(SIGUSR2, to: "opencode")
+    }
+}
+
 private func setTheme(_ theme: String, in settings: URL) throws {
     let text = (try? String(contentsOf: settings, encoding: .utf8)) ?? "{\n}\n"
     let updated = Files.setJSONString("theme", theme, in: text)

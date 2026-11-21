@@ -89,6 +89,7 @@ enum ThemeApplier {
         CursorTarget(),
         PiTarget(),
         ClaudeCodeTarget(),
+        OpencodeTarget(),
     ]
 
     static func apply(_ theme: Theme) throws -> ApplyReport {
