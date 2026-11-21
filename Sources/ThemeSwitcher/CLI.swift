@@ -15,6 +15,8 @@ enum CLI {
           update         Fetch the latest themes from Omarchy.
           skill setup    Install the agent skill for Claude Code, Codex, OpenCode, and pi.
                          skill status, skill remove, and skill show manage it.
+          helium setup   Install the helper that lets Theme Switcher colour Helium. Asks for
+                         your password once. helium status and helium remove manage it.
 
         --json prints the app's reply as JSON.
         Exit status: 0 on success, 1 when the command or an app failed, 2 on a usage error.
@@ -39,6 +41,8 @@ enum CLI {
         case ("set", 2...): request = .set(theme: words.dropFirst().joined(separator: " "))
         case ("skill", _):
             return Skill.run(Array(words.dropFirst()))
+        case ("helium", _):
+            return HeliumPolicy.run(Array(words.dropFirst()))
         case ("help", _), ("--help", _), ("-h", _):
             print(usage)
             return 0

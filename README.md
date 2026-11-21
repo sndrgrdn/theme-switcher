@@ -21,9 +21,10 @@ Picking a theme applies it to every app below at the same time. Theme Switcher s
 | [OpenCode](https://opencode.ai) | `$XDG_CONFIG_HOME/opencode` or `~/.config/opencode` | Writes `themes/omarchy.json`, selects it in `cli.json`, and signals running OpenCode sessions to reload it. Needs OpenCode 2 or later. |
 | [Herdr](https://herdr.dev) | `$HERDR_APP_HOME` or `~/.config/herdr-app` | Writes `themes/omarchy.json` and selects it in `settings.json`. Herdr 0.1.11 and later reload it while they run. |
 | [Ghostty](https://ghostty.org) | `Ghostty.app` in `/Applications` or `~/Applications` | Points `theme` in Ghostty's config at the generated `ghostty.conf`, then signals Ghostty to reload. Needs Ghostty 1.2 or later, because earlier versions quit on that signal. |
+| [Helium](https://helium.computer) | `Helium.app`, anywhere macOS can find it | Sets Helium's `BrowserThemeColor` policy and tells a running Helium to reload it. Needs a one-time setup. See [Connect Helium](#connect-helium). |
 | [Hunk](https://github.com/modem-dev/hunk) | `hunk` | Signals running Hunk sessions to read the terminal's new colours. Set `theme = "terminal"` in Hunk's config so that Hunk uses them. |
 
-Chrome, Helium, and other Chromium browsers aren't themed. Omarchy sets their colour through a browser policy. On macOS, a browser applies that policy only when an administrator writes it, and only when the browser starts.
+Chrome and other Chromium browsers aren't themed.
 
 Before Theme Switcher changes one of your config files for the first time, it copies the original to `~/Library/Application Support/Theme Switcher/backups`.
 
@@ -167,6 +168,25 @@ Theme Switcher writes colour variables such as `COLOR_BACKGROUND` and `COLOR_ACC
 THEME_COLORS="$HOME/Library/Application Support/Theme Switcher/current/sketchybar.sh"
 [ -f "$THEME_COLORS" ] && . "$THEME_COLORS"
 ```
+
+## Connect Helium
+
+Helium takes its colour from a browser policy, which only root can write. Install a small helper once:
+
+```sh
+theme-switcher helium setup
+```
+
+The command asks for your password and installs two files:
+
+- `/Library/PrivilegedHelperTools/garden.sander.theme-switcher.helium`, a script that writes or removes one setting, `BrowserThemeColor`, in `/Library/Managed Preferences/<you>/net.imput.helium.plist`. It accepts only a colour in `#rrggbb` form or `--remove`.
+- `/etc/sudoers.d/theme-switcher-helium`, which lets your user run that script, and nothing else, without a password.
+
+On each theme switch, Theme Switcher runs the script, tells macOS that Helium's managed settings changed, and asks a running Helium to reload its policies. Helium recolours while it runs.
+
+The colour comes from the theme's `chromium.theme` file, as in Omarchy, or else from its background colour. Helium builds its whole palette from that one colour. Because the colour is a policy, Helium says that your organisation manages it. Pages that are already open keep their old background until they reload.
+
+Run `theme-switcher helium status` to check the helper. `theme-switcher helium remove` deletes the helper, the `sudoers` rule, and Helium's colour.
 
 ## Files
 

@@ -4,7 +4,7 @@ enum Skill {
     static let guide = """
         # Theme Switcher
 
-        Change the Mac's theme with the `theme-switcher` command. A theme sets macOS light or dark mode, the wallpaper, and the colours of SketchyBar, dinky, Rex, Cursor, pi, Claude Code, OpenCode, Herdr, Ghostty, and Hunk in one step. Apply a theme only when the user asks for a change, because it changes their whole desktop.
+        Change the Mac's theme with the `theme-switcher` command. A theme sets macOS light or dark mode, the wallpaper, and the colours of SketchyBar, dinky, Rex, Cursor, pi, Claude Code, OpenCode, Herdr, Ghostty, Hunk, and Helium in one step. Apply a theme only when the user asks for a change, because it changes their whole desktop.
 
         ## Choose a theme
 

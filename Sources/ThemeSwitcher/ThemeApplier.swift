@@ -93,6 +93,7 @@ enum ThemeApplier {
         HerdrTarget(),
         GhosttyTarget(),
         HunkTarget(),
+        HeliumTarget(),
     ]
 
     static func apply(_ theme: Theme) throws -> ApplyReport {

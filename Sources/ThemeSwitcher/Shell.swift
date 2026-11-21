@@ -14,7 +14,8 @@ enum Shell {
     ]
 
     static func which(_ command: String) -> String? {
-        searchPath.map { "\($0)/\(command)" }.first { FileManager.default.isExecutableFile(atPath: $0) }
+        if command.hasPrefix("/") { return FileManager.default.isExecutableFile(atPath: command) ? command : nil }
+        return searchPath.map { "\($0)/\(command)" }.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 
     @discardableResult
