@@ -6,7 +6,7 @@ Theme Switcher brings [Omarchy](https://github.com/basecamp/omarchy)'s themes to
 
 ## What a theme changes
 
-Picking a theme applies it to every app below at the same time. Theme Switcher skips an app it can't find: SketchyBar, Rex, and Cursor need their command-line tool, dinky needs `dinky.toml`, and pi and Claude Code need their config folder. The menu warns only about apps that are installed but fail to change.
+Picking a theme applies it to every app below at the same time. Theme Switcher skips an app it can't find: SketchyBar, Rex, and Cursor need their command-line tool, dinky needs `dinky.toml`, pi, Claude Code, OpenCode, and Herdr need their config folder, and Ghostty needs `Ghostty.app` in `/Applications` or `~/Applications`. The menu warns only about apps that are installed but fail to change.
 
 | App | What changes |
 | --- | --- |
@@ -18,6 +18,9 @@ Picking a theme applies it to every app below at the same time. Theme Switcher s
 | [Cursor](https://cursor.com) | Installs the theme's own extension, or a generated `Omarchy` theme when there is none, and selects it in `settings.json`. |
 | [pi](https://github.com/earendil-works/pi) | Writes `~/.pi/agent/themes/omarchy-system.json` and selects it in `settings.json`. |
 | [Claude Code](https://claude.com/claude-code) | Writes `themes/omarchy.json` in `$CLAUDE_CONFIG_DIR` or `~/.claude`, and selects `custom:omarchy` in `settings.json`. |
+| [OpenCode](https://opencode.ai) | Writes `themes/omarchy.json` in `$XDG_CONFIG_HOME/opencode` or `~/.config/opencode`, selects it in `cli.json`, and signals running `opencode` processes to reload. |
+| [Herdr](https://herdr.dev) | Writes `themes/omarchy.json` in `$HERDR_APP_HOME` or `~/.config/herdr-app`, and selects it in `settings.json`. |
+| [Ghostty](https://ghostty.org) | Points `theme` in Ghostty's config at the generated `ghostty.conf`, then signals Ghostty to reload. |
 
 Before Theme Switcher changes one of your config files for the first time, it copies the original to `~/Library/Application Support/Theme Switcher/backups`.
 
