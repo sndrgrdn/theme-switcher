@@ -3,29 +3,31 @@ import SwiftUI
 
 enum Carousel {
     static let expanded = CGSize(width: 768, height: 475)
-    static let slice = CGSize(width: 108, height: 432)
-    static let spacing: CGFloat = -30
-    static let skew: CGFloat = 28
+    static let slice = CGSize(width: 84, height: 440)
+    static let gap: CGFloat = 10
     static let topMargin: CGFloat = 30
     static let chromeHeight: CGFloat = 104
-    static var step: CGFloat { slice.width + spacing }
+    static var step: CGFloat { slice.width + gap }
 
-    static func frame(relative: Int, previewX: CGFloat) -> CGRect {
-        let size = relative == 0 ? expanded : slice
-        let x: CGFloat = relative == 0 ? previewX
-            : relative < 0 ? previewX + CGFloat(relative) * step
-            : previewX + expanded.width + spacing + CGFloat(relative - 1) * step
-        return CGRect(x: x, y: (expanded.height - size.height) / 2, width: size.width, height: size.height)
+    static func radius(width: CGFloat) -> Int {
+        max(1, min(16, Int(((width - expanded.width) / (2 * step)).rounded(.up)) + 1))
     }
 
-    static func contains(_ point: CGPoint, in rect: CGRect) -> Bool {
-        guard rect.minY...rect.maxY ~= point.y else { return false }
-        let shift = skew * (rect.maxY - point.y) / rect.height
-        return rect.minX + shift...rect.maxX - skew + shift ~= point.x
+    static func frame(relative: Int, previewX: CGFloat, radius: Int) -> CGRect {
+        if relative == 0 { return CGRect(x: previewX, y: 0, width: expanded.width, height: expanded.height) }
+        let distance = CGFloat(abs(relative))
+        let height = slice.height * sqrt(max(0.05, 1 - pow(distance / (CGFloat(radius) + 0.6), 2)))
+        let x = relative < 0 ? previewX - distance * step
+            : previewX + expanded.width + gap + (distance - 1) * step
+        return CGRect(x: x, y: (expanded.height - height) / 2, width: slice.width, height: height)
+    }
+
+    static func cornerRadius(for rect: CGRect) -> CGFloat {
+        min(18, max(8, min(rect.width, rect.height) * 0.12))
     }
 
     static var motion: Animation? {
-        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .spring(duration: 0.22, bounce: 0)
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : .smooth(duration: 0.35)
     }
 }
 
@@ -44,19 +46,29 @@ final class PickerModel: ObservableObject {
 
     var previewX: CGFloat { (width - Carousel.expanded.width) / 2 }
 
-    var radius: Int {
-        max(1, min(16, Int(((width - Carousel.expanded.width) / (2 * Carousel.step)).rounded(.up)) + 1))
+    var radius: Int { Carousel.radius(width: width) }
+
+    func frame(_ relative: Int) -> CGRect {
+        Carousel.frame(relative: relative, previewX: previewX, radius: radius)
+    }
+
+    var visible: [(relative: Int, theme: Theme)] {
+        let matching = matching
+        guard !matching.isEmpty else { return [] }
+        let position = matching.firstIndex { $0.id == selectedID } ?? 0
+        if matching.count >= 2 * radius + 2 {
+            return (-radius...radius).map { ($0, matching[(position + $0 + matching.count) % matching.count]) }
+        }
+        return matching.indices.filter { abs($0 - position) <= radius }.map { ($0 - position, matching[$0]) }
     }
 
     func hit(_ point: CGPoint) -> Theme? {
         let local = CGPoint(x: point.x - origin.x, y: point.y - origin.y)
-        let matching = matching
-        let position = matching.firstIndex { $0.id == selectedID } ?? 0
-        return matching.indices
-            .filter { abs($0 - position) <= radius }
-            .sorted { abs($0 - position) < abs($1 - position) }
-            .first { Carousel.contains(local, in: Carousel.frame(relative: $0 - position, previewX: previewX)) }
-            .map { matching[$0] }
+        return visible
+            .filter { abs($0.relative) < radius }
+            .sorted { abs($0.relative) < abs($1.relative) }
+            .first { frame($0.relative).contains(local) }?
+            .theme
     }
 
     init(themes: [Theme], current: String?) {
@@ -82,7 +94,9 @@ final class PickerModel: ObservableObject {
             for theme in order.dropFirst() {
                 guard self?.loading == true else { return }
                 guard let image = Previews.image(theme) else { continue }
-                DispatchQueue.main.async { self?.images[theme.id] = image }
+                DispatchQueue.main.async {
+                    withAnimation(.easeOut(duration: 0.2)) { self?.images[theme.id] = image }
+                }
             }
         }
     }
@@ -118,21 +132,8 @@ final class PickerModel: ObservableObject {
     }
 
     private func distance(_ index: Int) -> Int {
-        abs(index - (themes.firstIndex { $0.id == selectedID } ?? 0))
-    }
-}
-
-struct Slant: Shape {
-    let skew: CGFloat
-
-    func path(in rect: CGRect) -> Path {
-        Path { path in
-            path.move(to: CGPoint(x: rect.minX + skew, y: rect.minY))
-            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-            path.addLine(to: CGPoint(x: rect.maxX - skew, y: rect.maxY))
-            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-            path.closeSubpath()
-        }
+        let offset = abs(index - (themes.firstIndex { $0.id == selectedID } ?? 0))
+        return min(offset, themes.count - offset)
     }
 }
 
@@ -140,44 +141,90 @@ struct PickerView: View {
     @ObservedObject var model: PickerModel
 
     var body: some View {
-        let matching = model.matching
-        let position = matching.firstIndex { $0.id == model.selectedID } ?? 0
-        let visible = matching.indices.filter { abs($0 - position) <= model.radius }
-
         ZStack {
             Color.black.opacity(0.001)
 
             VStack(spacing: 0) {
                 ZStack(alignment: .topLeading) {
-                    ForEach(visible, id: \.self) { index in
-                        Card(theme: matching[index], relative: index - position, model: model)
+                    ForEach(model.visible, id: \.theme.id) { item in
+                        Card(theme: item.theme, relative: item.relative, model: model)
                     }
                 }
                 .frame(width: model.width, height: Carousel.expanded.height, alignment: .topLeading)
                 .padding(.top, Carousel.topMargin)
 
-                VStack(spacing: 8) {
-                    label(model.selected?.name ?? (model.query.isEmpty ? "" : "No matches"), size: 24, weight: .semibold)
-                    label(model.query, size: 14, weight: .regular)
-                        .opacity(model.query.isEmpty ? 0 : 0.85)
-                }
-                .padding(.top, 16)
-                .frame(width: Carousel.expanded.width, height: Carousel.chromeHeight, alignment: .top)
+                caption
+                    .padding(.top, 26)
+                    .frame(width: Carousel.expanded.width, height: Carousel.chromeHeight, alignment: .top)
             }
         }
     }
 
-    private func label(_ text: String, size: CGFloat, weight: Font.Weight) -> some View {
-        let outline = model.color("background", .black).opacity(0.7)
-        return Text(text)
-            .font(.custom("TX-02", size: size).weight(weight))
-            .foregroundStyle(model.color("foreground", .white))
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .contentTransition(.identity)
-            .shadow(color: outline, radius: 0, x: 1, y: 1)
-            .shadow(color: outline, radius: 0, x: -1, y: -1)
-            .shadow(color: outline, radius: 2)
+    private var caption: some View {
+        HStack(spacing: 12) {
+            if let theme = model.selected {
+                Text(theme.name)
+                    .font(.custom("TX-02", size: 17).weight(.semibold))
+                    .foregroundStyle(.white)
+                HStack(spacing: 5) {
+                    ForEach(["red", "yellow", "green", "cyan", "blue", "magenta"], id: \.self) { key in
+                        Circle()
+                            .fill(theme.color(key))
+                            .frame(width: 9, height: 9)
+                            .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 0.5))
+                    }
+                }
+            } else {
+                Text("No matches")
+                    .font(.custom("TX-02", size: 17).weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.6))
+            }
+            if !model.query.isEmpty {
+                Rectangle().fill(.white.opacity(0.2)).frame(width: 1, height: 16)
+                HStack(spacing: 5) {
+                    Image(systemName: "magnifyingglass")
+                    Text(model.query)
+                }
+                .font(.custom("TX-02", size: 14))
+                .foregroundStyle(.white.opacity(0.75))
+            }
+        }
+        .lineLimit(1)
+        .padding(.horizontal, 18)
+        .frame(height: 40)
+        .background(Blur(radius: 20))
+        .overlay(Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 1))
+        .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
+        .transaction { $0.animation = nil }
+    }
+}
+
+struct Blur: NSViewRepresentable {
+    let radius: CGFloat
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .hudWindow
+        view.blendingMode = .behindWindow
+        view.state = .active
+        view.appearance = NSAppearance(named: .vibrantDark)
+        view.maskImage = NSImage(size: NSSize(width: radius * 2 + 1, height: radius * 2 + 1), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
+        view.maskImage?.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+        view.maskImage?.resizingMode = .stretch
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
+}
+
+extension Theme {
+    func color(_ key: String) -> Color {
+        guard let (r, g, b) = palette[key].flatMap(Palette.rgb) else { return .gray }
+        return Color(red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255)
     }
 }
 
@@ -188,11 +235,13 @@ struct Card: View {
 
     var body: some View {
         let selected = relative == 0
-        let frame = Carousel.frame(relative: relative, previewX: model.previewX)
-        let shape = Slant(skew: Carousel.skew)
+        let frame = model.frame(relative)
+        let corner = Carousel.cornerRadius(for: frame)
+        let shape = RoundedRectangle(cornerRadius: corner, style: .continuous)
         let image = model.images[theme.id]
         let hovering = model.hoveredID == theme.id
         let pressed = model.pressedID == theme.id
+        let dim = selected ? 0 : hovering ? 0.2 : 0.42
 
         ZStack {
             if let image {
@@ -205,33 +254,26 @@ struct Card: View {
             } else {
                 swatches
             }
-            model.color("background", .black).opacity(selected ? 0 : hovering ? 0.2 : 0.42)
+            model.color("background", .black).opacity(dim)
         }
         .frame(width: frame.width, height: frame.height)
         .clipShape(shape)
-        .overlay(shape.stroke(selected ? model.color("accent", .accentColor) : model.color("foreground", .white).opacity(0.28),
-                              lineWidth: selected ? 3 : 1))
-        .shadow(color: .black.opacity(selected ? 0.35 : 0), radius: selected ? 32 : 0, y: selected ? 18 : 0)
+        .overlay(shape.strokeBorder(selected ? theme.color("accent") : .white.opacity(0.12), lineWidth: selected ? 2.5 : 1))
+        .shadow(color: .black.opacity(selected ? 0.45 : 0.18), radius: selected ? 30 : 8, y: selected ? 18 : 4)
         .scaleEffect(pressed ? 0.97 : 1)
-        .animation(.easeOut(duration: 0.16), value: pressed)
-        .animation(.easeOut(duration: 0.15), value: hovering)
-        .animation(.easeOut(duration: 0.15), value: image != nil)
+        .opacity(abs(relative) >= model.radius ? 0 : 1)
         .offset(x: frame.minX, y: frame.minY)
         .zIndex(selected ? 100 : Double(50 - min(abs(relative), 40)))
+        .transition(.opacity)
         .allowsHitTesting(false)
     }
 
     private var swatches: some View {
         HStack(spacing: 0) {
             ForEach(["background", "red", "yellow", "green", "cyan", "blue", "magenta", "foreground"], id: \.self) { key in
-                Rectangle().fill(color(key))
+                Rectangle().fill(theme.color(key))
             }
         }
-    }
-
-    private func color(_ key: String) -> Color {
-        guard let (r, g, b) = theme.palette[key].flatMap(Palette.rgb) else { return .gray }
-        return Color(red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255)
     }
 }
 
@@ -324,13 +366,15 @@ final class PickerController: NSObject, NSWindowDelegate {
         let theme = model.hit(point)
         switch event.type {
         case .mouseMoved, .leftMouseDragged:
-            if model.hoveredID != theme?.id { model.hoveredID = theme?.id }
-            if model.pressedID != nil, model.pressedID != theme?.id { model.pressedID = nil }
+            withAnimation(.easeOut(duration: 0.15)) {
+                if model.hoveredID != theme?.id { model.hoveredID = theme?.id }
+                if model.pressedID != nil, model.pressedID != theme?.id { model.pressedID = nil }
+            }
         case .leftMouseDown:
-            model.pressedID = theme?.id
+            withAnimation(.easeOut(duration: 0.12)) { model.pressedID = theme?.id }
         case .leftMouseUp:
             let pressed = model.pressedID
-            model.pressedID = nil
+            withAnimation(.easeOut(duration: 0.16)) { model.pressedID = nil }
             guard let theme else { return close() }
             guard theme.id == pressed else { return }
             theme.id == model.selectedID ? pick(theme) : model.select(theme)
