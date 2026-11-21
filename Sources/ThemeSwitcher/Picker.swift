@@ -259,7 +259,7 @@ struct Card: View {
         .frame(width: frame.width, height: frame.height)
         .clipShape(shape)
         .overlay(shape.strokeBorder(selected ? theme.color("accent") : .white.opacity(0.12), lineWidth: selected ? 2.5 : 1))
-        .shadow(color: .black.opacity(selected ? 0.45 : 0.18), radius: selected ? 30 : 8, y: selected ? 18 : 4)
+        .shadow(color: .black.opacity(selected ? 0.45 : 0), radius: selected ? 30 : 0, y: selected ? 18 : 0)
         .scaleEffect(pressed ? 0.97 : 1)
         .opacity(abs(relative) >= model.radius ? 0 : 1)
         .offset(x: frame.minX, y: frame.minY)
